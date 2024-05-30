@@ -1,6 +1,6 @@
 """
-same as rnn_ntf_pos.py but with
-weighted joints
+same as rrn_v2.py 
+but loss calculated after iterating through target sequence on the entire generated sequence
 """
 
 import torch
@@ -33,103 +33,125 @@ Mocap Data
 """
 
 # mocap settings
-mocap_data_path = "E:/data/mocap/stocos/bvh/spatialrecovery_fullbody_take2.bvh"
-mocap_valid_frame_range = [ 500, 9500 ]
+
+"""
+mocap_file_path = "../../../../../../Data/mocap/stocos/solos/"
+mocap_files = ["Muriel_Take1.bvh",
+               "Muriel_Take2.bvh",
+               "Muriel_Take3.bvh",
+               "Muriel_Take4.bvh",
+               "Muriel_Take6.bvh",
+               "Muriel_Take7.bvh" ]
+
+mocap_valid_frame_ranges = [ [ [ 0, 16709 ] ],
+                              [ [ 0, 11540 ] ],
+                              [ [ 0, 12373 ] ],
+                              [ [ 0, 5005 ] ],
+                              [ [ 0, 27628 ] ],
+                              [ [ 0, 12380 ] ] ]
+"""
+
+mocap_file_path = "../../../../../../Data/mocap/stocos/solos/"
+mocap_files = ["Muriel_Take1.bvh" ]
+mocap_valid_frame_ranges = [ [ [ 0, 16709 ] ] ]
+
 joint_loss_weights = [ 
     1.0, # Hips
-    1.0, # Spine
-    1.0, # Spine1
-    1.0, # Spine2
-    1.0, # Neck
-    1.0, # Head
-    1.0, # Head_Nub
-    1.0, # LeftShoulder
-    1.0, # LeftArm
-    1.0, # LeftForeArm
-    1.0, # LeftForeArmRoll
-    1.0, # LeftHand
-    0.05, # LeftInHandThumb
-    0.05, # LeftHandThumb1
-    0.05, # LeftHandThumb2
-    0.05, # LeftHandThumb3
-    0.05, # LeftHandThumb3_Nub
-    0.05, # LeftInHandIndex
-    0.05, # LeftHandIndex1
-    0.05, # LeftHandIndex2
-    0.05, # LeftHandIndex3
-    0.05, # LeftHandIndex3_Nub
-    0.05, # LeftInHandMiddle
-    0.05, # LeftHandMiddle1
-    0.05, # LeftHandMiddle2
-    0.05, # LeftHandMiddle3
-    0.05, # LeftHandMiddle3_Nub
-    0.05, # LeftInHandRing
-    0.05, # LeftHandRing1
-    0.05, # LeftHandRing2
-    0.05, # LeftHandRing3
-    0.05, # LeftHandRing3_Nub
-    0.05, # LeftInHandPinky
-    0.05, # LeftHandPinky1
-    0.05, # LeftHandPinky2
-    0.05, # LeftHandPinky3
-    0.05, # LeftHandPinky3_Nub
-    1.0, # RightShoulder
-    1.0, # RightArm
-    1.0, # RightForeArm
-    1.0, # RightForeArmRoll
-    1.0, # RightHand
-    0.05, # RightInHandThumb
-    0.05, # RightHandThumb1
-    0.05, # RightHandThumb2
-    0.05, # RightHandThumb3
-    0.05, # RightHandThumb3_Nub
-    0.05, # RightInHandIndex
-    0.05, # RightHandIndex1
-    0.05, # RightHandIndex2
-    0.05, # RightHandIndex3
-    0.05, # RightHandIndex3_Nub
-    0.05, # RightInHandMiddle
-    0.05, # RightHandMiddle1
-    0.05, # RightHandMiddle2
-    0.05, # RightHandMiddle3
-    0.05, # RightHandMiddle3_Nub
-    0.05, # RightInHandRing
-    0.05, # RightHandRing1
-    0.05, # RightHandRing2
-    0.05, # RightHandRing3
-    0.05, # RightHandRing3_Nub
-    0.05, # RightInHandPinky
-    0.05, # RightHandPinky1
-    0.05, # RightHandPinky2
-    0.05, # RightHandPinky3
-    0.05, # RightHandPinky3_Nub
+    1.0, # RightUpLeg
+    1.0, # RightLeg
+    1.0, # RightFoot
+    1.0, # RightToeBase
+    1.0, # RightToeBase_Nub
     1.0, # LeftUpLeg
     1.0, # LeftLeg
     1.0, # LeftFoot
     1.0, # LeftToeBase
     1.0, # LeftToeBase_Nub
-    1.0, # RightUpLeg
-    1.0, # RightLeg
-    1.0, # RightFoot
-    1.0, # RightToeBase
-    1.0 # RightToeBase_Nub
+    1.0, # Spine
+    1.0, # Spine1
+    1.0, # Spine2
+    1.0, # Spine3
+    1.0, # LeftShoulder
+    1.0, # LeftArm
+    1.0, # LeftForeArm
+    1.0, # LeftHand
+    1.0, # LeftHand_Nub
+    1.0, # RightShoulder
+    1.0, # RightArm
+    1.0, # RightForeArm
+    1.0, # RightHand
+    1.0, # RightHand_Nub
+    1.0, # Neck
+    1.0, # Head
+    1.0 # Head_Nub
     ]
+
 mocap_fps = 50
 
-# load mocap data
+
+"""
+Model Settings
+"""
+
+rnn_layer_dim = 512
+rnn_layer_count = 2
+
+save_weights = True
+load_weights = False
+rnn_weights_file = "results_xSens_stocos_takes1-7/weights/rnn_weights_epoch_200"
+
+"""
+Training settings
+"""
+
+batch_size = 32
+test_percentage = 0.1
+
+seq_input_length = 64
+seq_output_length = 10 # this is only used for non-teacher forcing scenarios
+
+learning_rate = 1e-4
+norm_loss_scale = 0.1
+pos_loss_scale = 0.1
+quat_loss_scale = 0.9
+teacher_forcing_prob = 0.0
+model_save_interval = 10
+
+epochs = 200
+save_history = True
+
+"""
+Visualization settings
+"""
+
+view_ele = 90.0
+view_azi = -90.0
+view_line_width = 1.0
+view_size = 4.0
+
+"""
+Load mocap data
+"""
+
 bvh_tools = bvh.BVH_Tools()
 mocap_tools = mocap.Mocap_Tools()
 
-bvh_data = bvh_tools.load(mocap_data_path)
-mocap_data = mocap_tools.bvh_to_mocap(bvh_data)
-mocap_data["motion"]["rot_local"] = mocap_tools.euler_to_quat(mocap_data["motion"]["rot_local_euler"], mocap_data["rot_sequence"])
+all_mocap_data = []
 
-# get mocap data
-pose_sequence = mocap_data["motion"]["rot_local"].astype(np.float32)
+for mocap_file in mocap_files:
+    
+    print("process file ", mocap_file)
+    
+    bvh_data = bvh_tools.load(mocap_file_path + "/" + mocap_file)
+    mocap_data = mocap_tools.bvh_to_mocap(bvh_data)
+    mocap_data["motion"]["rot_local"] = mocap_tools.euler_to_quat(mocap_data["motion"]["rot_local_euler"], mocap_data["rot_sequence"])
 
-total_sequence_length = pose_sequence.shape[0]
-joint_count = pose_sequence.shape[1]
-joint_dim = pose_sequence.shape[2]
+    all_mocap_data.append(mocap_data)
+    
+# retrieve mocap properties
+mocap_data = all_mocap_data[0]
+joint_count = mocap_data["motion"]["rot_local"].shape[1]
+joint_dim = mocap_data["motion"]["rot_local"].shape[2]
 pose_dim = joint_count * joint_dim
 
 offsets = mocap_data["skeleton"]["offsets"].astype(np.float32)
@@ -149,26 +171,43 @@ def get_edge_list(children):
 edge_list = get_edge_list(children)
 
 """
-Dataset
+Create Dataset
 """
 
-seq_input_length = 64
-seq_output_length = 10 # this is only used for non-teacher forcing scenarios
 X = []
 y = []
 
-for pI in range(total_sequence_length - seq_input_length - seq_output_length - 1):
-    X_sample = pose_sequence[pI:pI+seq_input_length]
-    X.append(X_sample.reshape((seq_input_length, pose_dim)))
+for i, mocap_data in enumerate(all_mocap_data):
     
-    Y_sample = pose_sequence[pI+seq_input_length:pI+seq_input_length+seq_output_length]
-    y.append(Y_sample.reshape((seq_output_length, pose_dim)))
+    print("mocap ", mocap_files[i])
+    
+    pose_sequence = mocap_data["motion"]["rot_local"]
+    pose_sequence = np.reshape(pose_sequence, (-1, pose_dim))
+    
+    print("shape ", pose_sequence.shape)
+    
+    valid_frame_ranges = mocap_valid_frame_ranges[i]
+    
+    for valid_frame_range in valid_frame_ranges:
+        
+        frame_range_start = valid_frame_range[0]
+        frame_range_end = valid_frame_range[1]
+        
+        print("frame range from ", frame_range_start, " to ", frame_range_end)
+        
+        for pI in np.arange(frame_range_start, frame_range_end - seq_input_length - seq_output_length - 1):
+
+            X_sample = pose_sequence[pI:pI+seq_input_length]
+            X.append(X_sample.reshape((seq_input_length, pose_dim)))
+            
+            Y_sample = pose_sequence[pI+seq_input_length:pI+seq_input_length+seq_output_length]  
+            y.append(Y_sample.reshape((seq_output_length, pose_dim)))
 
 X = np.array(X)
 y = np.array(y)
 
-X = torch.from_numpy(X)
-y = torch.from_numpy(y)
+X = torch.from_numpy(X).to(torch.float32)
+y = torch.from_numpy(y).to(torch.float32)
 
 class SequenceDataset(Dataset):
     def __init__(self, X, y):
@@ -183,17 +222,23 @@ class SequenceDataset(Dataset):
 
 full_dataset = SequenceDataset(X, y)
 
+X_item, y_item = full_dataset[0]
 
-test_percentage = 0.1
+print("X_item s ", X_item.shape)
+print("y_item s ", y_item.shape)
+
 test_size = int(test_percentage * len(full_dataset))
 train_size = len(full_dataset) - test_size
 
 train_dataset, test_dataset = torch.utils.data.random_split(full_dataset, [train_size, test_size])
 
-batch_size = 32
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
+X_batch, y_batch = next(iter(train_loader))
+
+print("X_batch s ", X_batch.shape)
+print("y_batch s ", y_batch.shape)
 
 """
 Reccurent Model
@@ -225,7 +270,7 @@ class Reccurent(nn.Module):
         
         return x
 
-rnn = Reccurent(pose_dim, 512, pose_dim, 2).to(device)
+rnn = Reccurent(pose_dim, rnn_layer_dim, pose_dim, rnn_layer_count).to(device)
 print(rnn)
 
 # test Reccurent model
@@ -239,28 +284,17 @@ test_y2 = rnn(batch_x)
 
 print(test_y2.shape)
 
-"""
-# load model weights if previously stored
-PATH = "results_lstm_ntf_pos_weighted_joints/weights/rnn_weights_epoch_400"
-rnn.load_state_dict(torch.load(PATH))
-"""
+if load_weights == True:
+    rnn.load_state_dict(torch.load(rnn_weights_file))
+
 
 """
 Training
 """
 
 
-learning_rate = 1e-4
-norm_loss_scale = 0.1
-pos_loss_scale = 0.1
-quat_loss_scale = 0.9
-teacher_forcing_prob = 0.0
-model_save_interval = 50
-save_weights = True
-epochs = 400
-
 optimizer = torch.optim.Adam(rnn.parameters(), lr=learning_rate)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.1) # reduce the learning every 20 epochs by a factor of 10
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.336) # reduce the learning every 20 epochs by a factor of 10
 
 joint_loss_weights = torch.tensor(joint_loss_weights, dtype=torch.float32)
 joint_loss_weights = joint_loss_weights.reshape(1, 1, -1).to(device)
@@ -394,6 +428,8 @@ def loss(y, yhat):
     return _total_loss, _norm_loss, _pos_loss, _quat_loss
 
 def train_step(pose_sequences, target_poses, teacher_forcing):
+    
+    rnn.train()
 
     #print("ar_train_step")    
     #print("teacher_forcing ", teacher_forcing)
@@ -406,10 +442,8 @@ def train_step(pose_sequences, target_poses, teacher_forcing):
     
     #print("output_poses_length ", output_poses_length)
     
-    _loss_total = torch.zeros((1)).to(device)
-    _norm_loss_total = torch.zeros((1)).to(device)
-    _pos_loss_total = torch.zeros((1)).to(device)
-    _quat_loss_total = torch.zeros((1)).to(device)
+    _pred_poses_for_loss = []
+    _target_poses_for_loss = []
     
     for o_i in range(1, output_poses_length):
         
@@ -424,24 +458,9 @@ def train_step(pose_sequences, target_poses, teacher_forcing):
         _target_poses = torch.unsqueeze(_target_poses, axis=1)
 
         #print("_target_poses s ", _target_poses.shape)
-
-        _loss, _norm_loss, _pos_loss, _quat_loss = loss(_target_poses, _pred_poses) 
         
-        
-        #print("_ar_loss s ", _ar_loss.shape)
-        #print("_ar_loss_total s ", _ar_loss_total.shape)
-
-        #print("_ae_pos_loss ", _ae_pos_loss)
-    
-        # Backpropagation
-        optimizer.zero_grad()
-        _loss.backward()
-        optimizer.step()
-        
-        _loss_total += _loss
-        _norm_loss_total += _norm_loss_total
-        _pos_loss_total += _pos_loss
-        _quat_loss_total += _quat_loss
+        _pred_poses_for_loss.append(_pred_poses)
+        _target_poses_for_loss.append(_target_poses)
         
         # shift input pose seqeunce one pose to the right
         # remove pose from beginning input pose sequence
@@ -462,16 +481,24 @@ def train_step(pose_sequences, target_poses, teacher_forcing):
         
         #print("_input_poses 2 s ", _input_poses.shape)
         
-    _loss_total /= o_i
-    _norm_loss_total /= o_i
-    _pos_loss_total /= o_i
-    _quat_loss_total /= o_i
+    _pred_poses_for_loss = torch.cat(_pred_poses_for_loss, dim=1)
+    _target_poses_for_loss = torch.cat(_target_poses_for_loss, dim=1)
+    
+    #print("_pred_poses_for_loss 2 s ", _pred_poses_for_loss.shape)
+    #print("_target_poses_for_loss 2 s ", _target_poses_for_loss.shape)
+    
+    _loss, _norm_loss, _pos_loss, _quat_loss = loss(_target_poses_for_loss, _pred_poses_for_loss) 
+    
+    # Backpropagation
+    optimizer.zero_grad()
+    _loss.backward()
+    optimizer.step()
     
     #print("_ar_loss_total mean s ", _ar_loss_total.shape)
     
     #return _ar_loss, _ar_norm_loss, _ar_quat_loss
     
-    return _loss_total, _norm_loss_total, _pos_loss_total, _quat_loss_total
+    return _loss, _norm_loss, _pos_loss, _quat_loss
 
 def test_step(pose_sequences, target_poses, teacher_forcing):
     
@@ -488,62 +515,54 @@ def test_step(pose_sequences, target_poses, teacher_forcing):
     
     #print("output_poses_length ", output_poses_length)
     
-    _loss_total = torch.zeros((1)).to(device)
-    _norm_loss_total = torch.zeros((1)).to(device)
-    _pos_loss_total = torch.zeros((1)).to(device)
-    _quat_loss_total = torch.zeros((1)).to(device)
+    _pred_poses_for_loss = []
+    _target_poses_for_loss = []
     
-    for o_i in range(1, output_poses_length):
-        
-        with torch.no_grad():
+    with torch.no_grad():
+    
+        for o_i in range(1, output_poses_length):
+            
             #print("_input_poses s ", _input_poses.shape)
-        
+            
             _pred_poses = rnn(_input_poses)
             _pred_poses = torch.unsqueeze(_pred_poses, axis=1)
-        
+            
             #print("_pred_poses s ", _pred_poses.shape)
-        
+            
             _target_poses = target_poses[:,o_i,:].detach().clone()
             _target_poses = torch.unsqueeze(_target_poses, axis=1)
-
-            #print("_target_poses s ", _target_poses.shape)
-
-            _loss, _norm_loss, _pos_loss, _quat_loss = loss(_target_poses, _pred_poses) 
-        
-        
-            #print("_ar_loss s ", _ar_loss.shape)
-            #print("_ar_loss_total s ", _ar_loss_total.shape)
-
-            #print("_ae_pos_loss ", _ae_pos_loss)
     
-            _loss_total += _loss
-            _norm_loss_total += _norm_loss_total
-            _pos_loss_total += _pos_loss
-            _quat_loss_total += _quat_loss
-        
-        # shift input pose seqeunce one pose to the right
-        # remove pose from beginning input pose sequence
-        # detach necessary to avoid error concerning running backprob a second time
-        _input_poses = _input_poses[:, 1:, :].detach().clone()
-        _target_poses = _target_poses.detach().clone()
-        _pred_poses = _pred_poses.detach().clone()
-        
-        # add predicted or target pose to end of input pose sequence
-        if teacher_forcing == True:
-            _input_poses = torch.concat((_input_poses, _target_poses), axis=1)
-        else:
-            #_pred_poses = torch.reshape(_pred_poses, (_pred_poses.shape[0], 1, joint_count, joint_dim))
-            _input_poses = torch.cat((_input_poses, _pred_poses), axis=1)
+            #print("_target_poses s ", _target_poses.shape)
             
-        #print("_input_poses s ", _input_poses.shape)
-
+            _pred_poses_for_loss.append(_pred_poses)
+            _target_poses_for_loss.append(_target_poses)
+            
+            # shift input pose seqeunce one pose to the right
+            # remove pose from beginning input pose sequence
+            # detach necessary to avoid error concerning running backprob a second time
+            _input_poses = _input_poses[:, 1:, :].detach().clone()
+            _target_poses = _target_poses.detach().clone()
+            _pred_poses = _pred_poses.detach().clone()
+            
+            # add predicted or target pose to end of input pose sequence
+            if teacher_forcing == True:
+                _input_poses = torch.concat((_input_poses, _target_poses), axis=1)
+            else:
+                #_pred_poses = torch.reshape(_pred_poses, (_pred_poses.shape[0], 1, joint_count, joint_dim))
+                _input_poses = torch.cat((_input_poses, _pred_poses), axis=1)
+                
+            #print("_input_poses s ", _input_poses.shape)
+    
+            
+            #print("_input_poses 2 s ", _input_poses.shape)
+            
+        _pred_poses_for_loss = torch.cat(_pred_poses_for_loss, dim=1)
+        _target_poses_for_loss = torch.cat(_target_poses_for_loss, dim=1)
         
-        #print("_input_poses 2 s ", _input_poses.shape)
+        #print("_pred_poses_for_loss 2 s ", _pred_poses_for_loss.shape)
+        #print("_target_poses_for_loss 2 s ", _target_poses_for_loss.shape)
         
-    _loss_total /= o_i
-    _norm_loss_total /= o_i
-    _pos_loss_total /= o_i
-    _quat_loss_total /= o_i
+        _loss, _norm_loss, _pos_loss, _quat_loss = loss(_target_poses_for_loss, _pred_poses_for_loss) 
     
     #print("_ar_loss_total mean s ", _ar_loss_total.shape)
     
@@ -551,7 +570,7 @@ def test_step(pose_sequences, target_poses, teacher_forcing):
     
     rnn.train()
     
-    return _loss_total, _norm_loss_total, _pos_loss_total, _quat_loss_total
+    return _loss, _norm_loss, _pos_loss, _quat_loss
 
 
 def train(train_dataloader, test_dataloader, epochs):
@@ -652,10 +671,12 @@ def create_ref_sequence_anim(start_pose_index, pose_count, file_name):
     print("start_pose_index ", start_pose_index)
     print("pose_count ", pose_count)
     
-    start_pose_index = max(start_pose_index, seq_input_length)
-    pose_count = min(pose_count, total_sequence_length - start_pose_index)
+    pose_sequence_length = pose_sequence.shape[0]
     
-    print("total_sequence_length ", total_sequence_length)
+    start_pose_index = max(start_pose_index, seq_input_length)
+    pose_count = min(pose_count, pose_sequence_length - start_pose_index)
+    
+    print("pose_sequence_length ", pose_sequence_length)
     print("start_pose_index ", start_pose_index)
     print("pose_count ", pose_count)
     
@@ -680,8 +701,10 @@ def create_ref_sequence_anim(start_pose_index, pose_count, file_name):
 def create_pred_sequence_anim(start_pose_index, pose_count, file_name):
     rnn.eval()
     
+    pose_sequence_length = pose_sequence.shape[0]
+    
     start_pose_index = max(start_pose_index, seq_input_length)
-    pose_count = min(pose_count, total_sequence_length - start_pose_index)
+    pose_count = min(pose_count, pose_sequence_length - start_pose_index)
     
     start_seq = pose_sequence[start_pose_index - seq_input_length:start_pose_index, :]
     start_seq = torch.from_numpy(start_seq).to(device)
@@ -731,8 +754,10 @@ def create_pred_sequence_anim(start_pose_index, pose_count, file_name):
 def create_pred_sequence(start_pose_index, pose_count):
     rnn.eval()
     
+    pose_sequence_length = pose_sequence.shape[0]
+    
     start_pose_index = max(start_pose_index, seq_input_length)
-    pose_count = min(pose_count, total_sequence_length - start_pose_index)
+    pose_count = min(pose_count, pose_sequence_length - start_pose_index)
     
     start_seq = pose_sequence[start_pose_index - seq_input_length:start_pose_index, :]
     start_seq = torch.from_numpy(start_seq).to(device)
@@ -767,8 +792,13 @@ def create_pred_sequence(start_pose_index, pose_count):
     
     return pred_poses.detach().cpu().numpy()
 
-seq_start_pose_index = 1500
-seq_pose_count = 1000
+seq_index = 0
+
+pose_sequence = all_mocap_data[seq_index]["motion"]["rot_local"].astype(dtype=np.float32)
+pose_sequence = pose_sequence.reshape(-1, pose_dim)
+
+seq_start_pose_index = 5200
+seq_pose_count = 2000
 
 # export as gif animations
 
@@ -777,9 +807,12 @@ create_pred_sequence_anim(seq_start_pose_index, seq_pose_count, "results/anims/p
 
 # export as bvh files
 
-pred_poses = create_pred_sequence(seq_start_pose_index, seq_pose_count)
+seq_start_pose_index = 11500
+seq_pose_count = 4022
 
-pred_poses.shape
+mocap_data = all_mocap_data[seq_index]
+
+pred_poses = create_pred_sequence(seq_start_pose_index, seq_pose_count)
 
 pred_dataset = {}
 pred_dataset["frame_rate"] = mocap_data["frame_rate"]
@@ -793,3 +826,27 @@ pred_dataset["motion"]["rot_local_euler"] = mocap_tools.quat_to_euler(pred_datas
 pred_bvh = mocap_tools.mocap_to_bvh(pred_dataset)
 
 bvh_tools.write(pred_bvh, "results/anims/pred_{}_{}_epoch_{}.bvh".format(seq_start_pose_index, seq_pose_count, epochs))
+
+bvh_tools.write(pred_bvh, "results/anims/tpose.bvh".format(seq_start_pose_index, seq_pose_count, epochs))
+
+
+"""
+Debug: export original mocap data as BVH file
+"""
+
+mocap_data = all_mocap_data[seq_index]
+seq_pose_count = mocap_data["motion"]["rot_local"].shape[0]
+
+pred_dataset = {}
+pred_dataset["frame_rate"] = mocap_data["frame_rate"]
+pred_dataset["rot_sequence"] = mocap_data["rot_sequence"]
+pred_dataset["skeleton"] = mocap_data["skeleton"]
+pred_dataset["motion"] = {}
+pred_dataset["motion"]["pos_local"] = np.repeat(np.expand_dims(pred_dataset["skeleton"]["offsets"], axis=0), seq_pose_count, axis=0)
+pred_dataset["motion"]["rot_local"] = mocap_data["motion"]["rot_local"]
+pred_dataset["motion"]["rot_local_euler"] = mocap_tools.quat_to_euler(mocap_data["motion"]["rot_local"], mocap_data["rot_sequence"])
+#pred_dataset["motion"]["rot_local_euler"] = mocap_tools.quat_to_euler(pred_dataset["motion"]["rot_local"], pred_dataset["rot_sequence"])
+
+pred_bvh = mocap_tools.mocap_to_bvh(pred_dataset)
+
+bvh_tools.write(pred_bvh, "ref_proc.bvh")
